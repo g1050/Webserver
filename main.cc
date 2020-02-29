@@ -1,18 +1,9 @@
-#include <iostream>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <cassert>
-#include <sys/epoll.h>
-#include <signal.h>
 #include "debug.h"
+#include "ulity.h"
+#include "epoll.h"
+#include "http_connect.h"
 
+#define MAXEVENTS 5000
 /* #include "http_conn.h" */
 /* #include "locker.h" */
 /* #include "threadpool.h" */
@@ -22,8 +13,11 @@ using namespace std;
 #define MAX_FD 65536
 #define MAX_EVENT_NUMBER 10000
 
+epoll_event* events;
+
 extern int addfd(int epollfd,int fd,bool one_shot);
 extern int removefd(int epollfd,int fd);
+
 
 void addsig(int sig,void (handler)(int),bool restart = true){
     struct sigaction sa;
@@ -48,6 +42,7 @@ int main(int argc,char *argv[])
     /* ignore SIGPIPE */
     addsig(SIGPIPE,SIG_IGN);
 
+    /* Create listen socket */
     int listenfd = socket(PF_INET,SOCK_STREAM,0);
     check_exit(listenfd >= 0,"func:socket error.");
 
@@ -70,67 +65,64 @@ int main(int argc,char *argv[])
     
     ret = listen(listenfd,5);
     check_exit(ret >= 0,"func:listen error.");
+    
+    /* setNonBlocking(listenfd); */
 
-    struct sockaddr_in client_address;
-    socklen_t client_address_length= sizeof(client_address);
+    /* Epoll init */ 
+    Epoll epoll(MAXEVENTS);
+    __uint32_t events_type = EPOLLIN | EPOLLET;
+    epoll.add(listenfd,events_type);
 
-    debug("%d",listenfd);
-    int conn = accept(listenfd,(struct sockaddr*)&client_address,&client_address_length);
-    debug("Accept new conect!");
+    Http_connect* http = new Http_connect[MAXEVENTS];
+    events = new epoll_event[MAXEVENTS];
+    while(true){
+        debug("Epoll start!");
+        int number = epoll.wait(MAXEVENTS,-1,events);
 
-    /* epoll_event events[MAX_EVENT_NUMBER]; */
-    /* int epollfd = epoll_create(5); */
-    /* assert(epollfd != -1); */
-    /* addfd(epollfd,listenfd,false); */
-    /* http_conn::m_epollfd = epollfd; */
+        if((number < 0) && (errno != EINTR)){
+            log_err("Epoll failure\n") ;
+            break;
+        }
 
-    /* /1* while(true){ *1/ */
-    /*     /1* std::cout << "Epoll start" << std::endl; *1/ */
-    /*     int number = epoll_wait(epollfd,events,MAX_EVENT_NUMBER,-1); */
-    /*     std::cout <<  number << std::endl; */
-    /*     if((number < 0) && (errno != EINTR)){ */
-    /*         printf("epoll failure\n"); */
-    /*         break; */
-    /*     } */
 
-/*         for(int i = 0;i<number;i++){ */
-/*             int sockfd = events[i].data.fd; */
-/*             //std::cout << "sockfd = " << sockfd << std::endl; */
+        for(int i = 0;i<number;i++){
+            int sockfd = events[i].data.fd;
 
-            /* if(sockfd == listenfd){ */
-            /*     cout << "新的连接请求" << endl; */
-            /*     struct sockaddr_in client_address; */
-            /*     socklen_t client_addrlength = sizeof(client_address); */
-            /*     int connfd = accept(listenfd,(struct sockaddr*)&client_address,&client_addrlength); */
-            /*     if(connfd < 0){ */
-            /*         printf("errno is:%d\n",errno); */
-            /*         continue; */
-            /*     } */
-            /*     if(http_conn::m_user_count >= MAX_FD){ */
-            /*         show_error(connfd,"Internal server busy"); */
-            /*         continue; */
-            /*     } */
+            if(sockfd == listenfd){
+                struct sockaddr_in client_address;
+                socklen_t client_addrlength = sizeof(client_address);
+                int connfd = accept(listenfd,(struct sockaddr*)&client_address,&client_addrlength);
 
-                /* /1* 初始化客户连接 *1/ */
-                /* users[connfd].init(connfd,client_address); */
-            /* }else if(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){ */
-                /* users[sockfd].close_conn(); */
+                if(connfd < 0){
+                    log_err("Errno is",errno);
+                    continue;
+                }
+
+                debug("Accept new connect");
+                epoll.add(connfd,events_type);
+            }else{
+                http[events->data.fd].init(events->data.fd);
+                http[events->data.fd].handle_request();
+            }
+            
+            /* else if(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){ */
+            /*     users[sockfd].close_conn(); */
             /* }else if(events[i].events & EPOLLIN){ */
-                /* cout << "客户端发出请求" << endl; */
-                /* if(users[sockfd].read()){ */
-                /*     pool->append(users + sockfd); */
-                /* }else{ */
-                /*     users[sockfd].close_conn(); */
-                /* } */
+            /*     cout << "客户端发出请求" << endl; */
+            /*     if(users[sockfd].read()){ */
+            /*         pool->append(users + sockfd); */
+            /*     }else{ */
+            /*         users[sockfd].close_conn(); */
+            /*     } */
             /* }else if(events[i].events & EPOLLOUT){ */
-                /* if(!users[sockfd].write()){ */
-                /*     users[sockfd].close_conn(); */
-                /* } */
+            /*     if(!users[sockfd].write()){ */
+            /*         users[sockfd].close_conn(); */
+            /*     } */
             /* }else{ */
-                /* ; */
+            /*     ; */
             /* } */
-        /* } */
-    /* } */
+        }
+    }
     
     close(listenfd);
 
