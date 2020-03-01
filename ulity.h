@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -15,6 +17,9 @@
 #include <sys/epoll.h>
 #include <signal.h>
 #include <memory>
+#include <string>
+#include <map>
+#include <vector>
 #include "debug.h"
 
 #define MAXSIZE 4096

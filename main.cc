@@ -94,7 +94,7 @@ int main(int argc,char *argv[])
                 int connfd = accept(listenfd,(struct sockaddr*)&client_address,&client_addrlength);
 
                 if(connfd < 0){
-                    log_err("Errno is",errno);
+                    log_err("Errno is %d",errno);
                     continue;
                 }
 
