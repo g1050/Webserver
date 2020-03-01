@@ -46,8 +46,32 @@ enum LINE_STATE{
     LINE_END_CR,
     LINE_END_LF
 };
-class Http_connect{
 
+class MimeType{
+public:
+    inline MimeType();
+    ~MimeType(){}
+private:
+    map<string,string> m_map;
+public:
+    string getMime(const string& suffix);
+};
+
+class ProcessFile{
+public:
+    ProcessFile(const string& file_name);
+private:
+    string m_file_name;
+    struct stat m_sbuf;
+    bool m_exist;
+public:
+    bool getFileInfo(struct stat& sbuf);
+    /* Write whole file to fd. */
+    bool sendFile(int send_fd) const;
+public:
+};
+
+class Http_connect{
 public:
     Http_connect(){} 
     void handle_request();
@@ -65,11 +89,14 @@ private:
     string m_file_name;
     size_t m_now_pos;
     map<string,string> m_map;
+    MimeType m_mime_type;
 private:
     STATE_OF_ANANYSIS analysisRequest();
     STATE_OF_ANANYSIS handleGet();
     URI_STATE parse_URI();
     HEADER_STATE parse_header();
+    void handleError(const int state_num,const char* msg);
+    void sendFile(const string& file_name);
 
 
 };

@@ -3,12 +3,119 @@
 
 /* inline Http_connect::Http_connect(){} */
 
+bool ProcessFile::getFileInfo(struct stat& sbuf){
+    if(m_exist){
+        sbuf = m_sbuf;
+        return true;
+    }else{
+        return false;
+    }
+}
+
+bool ProcessFile::sendFile(int send_fd) const{
+
+    /* Opend file and send file. */
+    int file_fd = open(m_file_name.c_str(),O_RDONLY,0);
+    /* Create map relation. */
+    char *file_addr = static_cast<char*>(mmap(NULL,m_sbuf.st_size,PROT_READ,MAP_PRIVATE,file_fd,0));
+    size_t send_len = write(send_fd,file_addr,m_sbuf.st_size);
+    if(send_len != (size_t)m_sbuf.st_size){
+        return false;
+    }
+    /* Delete the map. */
+    munmap(file_addr,m_sbuf.st_size);
+    close(file_fd);
+    return true;
+}
+
+ProcessFile::ProcessFile(const string& file_name):m_file_name(file_name){
+    if(stat(m_file_name.c_str(),&m_sbuf) < 0){
+        m_exist = false; 
+    }else{
+        m_exist = true;
+    }
+}
+
+/* Define static variable. */
+/* map<string,string> MimeType::m_map; */
+
+/* Create the map from suffix to type. */
+inline MimeType::MimeType(){
+
+    m_map[".html"] = "text/html";
+
+    m_map[".avi"] = "video/x-msvideo";
+
+    m_map[".bmp"] = "image/bmp";
+
+    m_map[".c"] = "text/plain";
+
+    m_map[".doc"] = "application/msword";
+
+    m_map[".gif"] = "image/gif";
+
+    m_map[".gz"] = "application/x-gzip";
+
+    m_map[".htm"] = "text/html";
+
+    m_map[".ico"] = "application/x-ico";
+
+    m_map[".jpg"] = "image/jpeg";
+
+    m_map[".png"] = "image/png";
+
+    m_map[".txt"] = "text/plain";
+
+    m_map[".mp3"] = "audio/mp3";
+
+    m_map["default"] = "text/html";
+
+}
+
+string MimeType::getMime(const string& suffix){
+
+    string s;
+    if(m_map.find(suffix) == m_map.end()){
+        return m_map["default"];
+    }else{
+        return m_map[suffix];
+    }
+    return s;
+
+}
+
 void Http_connect::init(int fd){
     m_fd = fd;
     m_parse_state = STATE_PARSE_URI; 
     m_now_pos = 0;
     m_line_state = LINE_START;
     m_keep_alive = false;
+    m_mime_type = MimeType();
+}
+
+
+void Http_connect::handleError(const int state_num,const char* msg){
+    
+    char header_buf[MAXSIZE];
+    struct stat sbuf;
+    
+    sprintf(header_buf,"HTTP/1.1 %d %s\r\n",state_num,msg);
+    sprintf(header_buf,"%sContent-type: text/html\r\n",header_buf);
+    sprintf(header_buf,"%sConnection: close\r\n",header_buf);
+    sprintf(header_buf,"%sContent-length: %ld\r\n",header_buf,sbuf.st_size);
+    sprintf(header_buf,"%s\r\n",header_buf);
+    
+    debug("header_buf: %s",header_buf);
+    write(m_fd,header_buf,strlen(header_buf));
+    ProcessFile file("404.html");
+    if(file.getFileInfo(sbuf)){
+        if(!file.sendFile(m_fd)){
+            log_err("Socket:%d send file error",m_fd);
+        }
+    }else{//To be cotinue.
+        log_err("404.html not found");
+    }
+
 }
 
 STATE_OF_ANANYSIS Http_connect::handleGet(){
@@ -23,25 +130,28 @@ STATE_OF_ANANYSIS Http_connect::handleGet(){
 
     size_t dot_pos = m_file_name.find('.');
 
-    const char* file_type = "text/html";
+    string file_type ;
 
-    /* if(dot_pos == string::npos){ */
-    /*     file_type = MimeType::getMime("default"); */
-    /* }else{ */
-    /*     file_type = MimeType::getMime(m_file_name.substr(dot_pos + 1).c_str()); */
-    /* } */
+    /* Get the file type. */
+    if(dot_pos == string::npos){
+        file_type = m_mime_type.getMime("default");
+    }else{
+        file_type = m_mime_type.getMime(m_file_name.substr(dot_pos + 1).c_str());
+    }
+    debug("file_type: %s",file_type);
 
-    /* Get the file'sinfomation. */
+    /* Get the file's infomation. */
     struct stat sbuf;
-    if(stat(m_file_name.c_str(),&sbuf) < 0){
+    ProcessFile processfile(m_file_name);
+    if(processfile.getFileInfo(sbuf)){
         log_err("%s doesn't exist\n",m_file_name.c_str());
-        /* handleError(); */
+        handleError(404,"404 Not Found");
         return ANALYSIS_ERROR;
     }
 
-    sprintf(header,"%sContent-type:%s\r\n",header,file_type);
+    sprintf(header,"%sContent-type:%s\r\n",header,file_type.c_str());
     sprintf(header,"%sContent-length:%ld\r\n",header,sbuf.st_size);
-    
+
     /* Write the end CR and LF. */
     sprintf(header,"%s\r\n",header);
 
@@ -51,20 +161,15 @@ STATE_OF_ANANYSIS Http_connect::handleGet(){
         log_err("Socket:%d Send header failed.",m_fd);
         return ANALYSIS_ERROR;
     }
-
-    /* Opend file and send file. */
-    int file_fd = open(m_file_name.c_str(),O_RDONLY,0);
-    /* Create map relation. */
-    char *file_addr = static_cast<char*>(mmap(NULL,sbuf.st_size,PROT_READ,MAP_PRIVATE,file_fd,0));
-    send_len = write(m_fd,file_addr,sbuf.st_size);
-    if(send_len != (size_t)sbuf.st_size){
-        log_err("Socket:%d Send file  failed.",m_fd);
+    
+    /* Send body to the client. */
+    if(!processfile.sendFile(m_fd)){
+        log_err("Socket:%d Send body failed.",m_fd);
+        return ANALYSIS_ERROR;
     }
-    /* Delete the map. */
-    munmap(file_addr,sbuf.st_size);
-    close(file_fd);
     return ANALYSIS_SUNCESS;
 }
+
 STATE_OF_ANANYSIS Http_connect::analysisRequest(){
 
     if(m_method == METHOD_GET){
