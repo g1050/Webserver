@@ -89,7 +89,7 @@ private:
     string m_file_name;
     size_t m_now_pos;
     map<string,string> m_map;
-    MimeType m_mime_type;
+    MimeType* m_mime_type;
 private:
     STATE_OF_ANANYSIS analysisRequest();
     STATE_OF_ANANYSIS handleGet();

@@ -74,13 +74,11 @@ inline MimeType::MimeType(){
 
 string MimeType::getMime(const string& suffix){
 
-    string s;
     if(m_map.find(suffix) == m_map.end()){
-        return m_map["default"];
+        return  m_map["default"];
     }else{
-        return m_map[suffix];
+        return  m_map[suffix];
     }
-    return s;
 
 }
 
@@ -90,7 +88,7 @@ void Http_connect::init(int fd){
     m_now_pos = 0;
     m_line_state = LINE_START;
     m_keep_alive = false;
-    m_mime_type = MimeType();
+    m_mime_type = new MimeType();
 }
 
 
@@ -108,7 +106,7 @@ void Http_connect::handleError(const int state_num,const char* msg){
     debug("header_buf: %s",header_buf);
     write(m_fd,header_buf,strlen(header_buf));
     ProcessFile file("404.html");
-    if(file.getFileInfo(sbuf)){
+    if(!file.getFileInfo(sbuf)){
         if(!file.sendFile(m_fd)){
             log_err("Socket:%d send file error",m_fd);
         }
@@ -134,16 +132,18 @@ STATE_OF_ANANYSIS Http_connect::handleGet(){
 
     /* Get the file type. */
     if(dot_pos == string::npos){
-        file_type = m_mime_type.getMime("default");
+        /* debug("default"); */
+        file_type = m_mime_type->getMime("default");
     }else{
-        file_type = m_mime_type.getMime(m_file_name.substr(dot_pos + 1).c_str());
+        /* debug("%s",m_file_name.substr(dot_pos).c_str()); */
+        file_type = m_mime_type->getMime(m_file_name.substr(dot_pos).c_str());
     }
-    debug("file_type: %s",file_type);
+    /* debug("file_type: %s",file_type.c_str()); */
 
     /* Get the file's infomation. */
     struct stat sbuf;
     ProcessFile processfile(m_file_name);
-    if(processfile.getFileInfo(sbuf)){
+    if(processfile.getFileInfo(sbuf) == false){
         log_err("%s doesn't exist\n",m_file_name.c_str());
         handleError(404,"404 Not Found");
         return ANALYSIS_ERROR;
