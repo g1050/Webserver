@@ -17,6 +17,7 @@ private:
     int m_epollfd;
     int m_listenfd;
     Http_connect* m_http;
+    vector<const Http_connect*> m_IO_events;
 
 };
 #endif

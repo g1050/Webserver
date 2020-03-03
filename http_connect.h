@@ -74,7 +74,7 @@ public:
 class Http_connect{
 public:
     Http_connect(){} 
-    void handle_request();
+    void handleRequest();
     void init(int fd);
 
 private:

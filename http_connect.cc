@@ -288,7 +288,7 @@ HEADER_STATE Http_connect::parse_header(){
     }
 }
 
-void Http_connect::handle_request(){
+void Http_connect::handleRequest(){
 
     while(true){
         /* Read from the socket. */

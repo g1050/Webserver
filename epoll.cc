@@ -40,11 +40,19 @@ int Epoll::wait(int max_events,int timeout){
                 debug("Accept new connect");
                 add(connfd,events_type);
             }else{
-                m_http[m_active_events->data.fd].init(m_active_events->data.fd);
-                m_http[m_active_events->data.fd].handle_request();
-                break;//
+                //Judge the type of I/O,push into vector.
+                m_IO_events.push_back(&m_http[sockfd]);
+                /* m_http[m_active_events->data.fd].init(m_active_events->data.fd); */
+                /* m_http[m_active_events->data.fd].handleRequest(); */
             }
 
+        }
+
+        //Traverse the vector,add them to the threadpool.
+        if(!m_IO_events.empty()) {
+            for(auto &cur_http:m_IO_events){
+                Threadpool::add(cur_http->init(),sockfd);
+            }
         }
     }
 
