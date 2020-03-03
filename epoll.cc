@@ -10,11 +10,13 @@ Epoll::Epoll(int LISTENQ,int listenfd,int MAXEVENTS){
 }
 
 int Epoll::wait(int max_events,int timeout){
-    int number = epoll_wait(m_epollfd,m_active_events,max_events,timeout);
-    check_exit(number >= 0,"func: Epollwait error. errorno:%d\n",errno);
+    int number;
     while(true){
 
         debug("Epoll start!");
+        number = epoll_wait(m_epollfd,m_active_events,max_events,timeout);
+        check_exit(number >= 0,"func: Epollwait error. errorno:%d\n",errno);
+
         if((number < 0) && (errno != EINTR)){
             log_err("Epoll failure\n") ;
             break;
@@ -31,7 +33,7 @@ int Epoll::wait(int max_events,int timeout){
 
                 if(connfd < 0){
                     log_err("Errno is %d",errno);
-                    exit(0);
+                    /* exit(0); */
                     continue;
                 }
                 __uint32_t  events_type = EPOLLIN | EPOLLET;
