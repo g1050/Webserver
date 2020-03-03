@@ -13,10 +13,7 @@ using namespace std;
 #define MAX_FD 65536
 #define MAX_EVENT_NUMBER 10000
 
-epoll_event* events;
-
-extern int addfd(int epollfd,int fd,bool one_shot);
-extern int removefd(int epollfd,int fd);
+/* epoll_event* events; */
 
 
 void addsig(int sig,void (handler)(int),bool restart = true){
@@ -33,7 +30,7 @@ void addsig(int sig,void (handler)(int),bool restart = true){
 
 int main(int argc,char *argv[])
 {
-    
+
     /* Parse argument,read config. */
     const char* ip = "127.0.0.1";
     int port = 8080;
@@ -46,10 +43,10 @@ int main(int argc,char *argv[])
     int listenfd = socket(PF_INET,SOCK_STREAM,0);
     check_exit(listenfd >= 0,"func:socket error.");
 
-    #ifndef NDEBUG
+#ifndef NDEBUG
     struct linger tmp = {1,0};
     setsockopt(listenfd,SOL_SOCKET,SO_LINGER,&tmp,sizeof(tmp));
-    #endif
+#endif
 
 
     /* Init server address. */
@@ -62,73 +59,22 @@ int main(int argc,char *argv[])
 
     ret = bind(listenfd,(struct sockaddr*)&address,sizeof(address));
     check_exit(ret >= 0,"func:bind error.");
-    
+
     ret = listen(listenfd,5);
     check_exit(ret >= 0,"func:listen error.");
-    
+
     /* setNonBlocking(listenfd); */
 
     /* Epoll init */ 
-    Epoll epoll(MAXEVENTS);
+    Epoll epoll(MAXEVENTS,listenfd);
     __uint32_t events_type = EPOLLIN | EPOLLET;
     epoll.add(listenfd,events_type);
 
-    Http_connect* http = new Http_connect[MAXEVENTS];
-    events = new epoll_event[MAXEVENTS];
-    while(true){
-        debug("Epoll start!");
-        int number = epoll.wait(MAXEVENTS,-1,events);
 
-        if((number < 0) && (errno != EINTR)){
-            log_err("Epoll failure\n") ;
-            break;
-        }
+    epoll.wait(MAXEVENTS,-1);
 
-
-        for(int i = 0;i<number;i++){
-            int sockfd = events[i].data.fd;
-
-            if(sockfd == listenfd){
-                struct sockaddr_in client_address;
-                socklen_t client_addrlength = sizeof(client_address);
-                int connfd = accept(listenfd,(struct sockaddr*)&client_address,&client_addrlength);
-
-                if(connfd < 0){
-                    log_err("Errno is %d",errno);
-                    continue;
-                }
-
-                debug("Accept new connect");
-                epoll.add(connfd,events_type);
-            }else{
-                http[events->data.fd].init(events->data.fd);
-                http[events->data.fd].handle_request();
-            }
-            
-            /* else if(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){ */
-            /*     users[sockfd].close_conn(); */
-            /* }else if(events[i].events & EPOLLIN){ */
-            /*     cout << "客户端发出请求" << endl; */
-            /*     if(users[sockfd].read()){ */
-            /*         pool->append(users + sockfd); */
-            /*     }else{ */
-            /*         users[sockfd].close_conn(); */
-            /*     } */
-            /* }else if(events[i].events & EPOLLOUT){ */
-            /*     if(!users[sockfd].write()){ */
-            /*         users[sockfd].close_conn(); */
-            /*     } */
-            /* }else{ */
-            /*     ; */
-            /* } */
-        }
-    }
-    
     close(listenfd);
 
-    /* close(epollfd); */
-    /* delete []users; */
-    /* delete pool; */
 
     return 0;
 }
