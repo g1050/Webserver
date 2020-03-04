@@ -53,10 +53,11 @@ void* Threadpool::threadRoutine(void *arg){
 }
 
 
-bool Threadpool::addTask(func_p p,int argument){
+bool Threadpool::addTask(func_p func,int arg){
+
     task task_add;
-    task_add.p = p;
-    task_add.argument = argument;
+    task_add.p = func;//std::bind(&Http_connect::init,cur_http,std::placeholders::_1);
+    task_add.argument = arg;
 
     pthread_mutex_lock(&m_lock);
     m_task_queue.push(task_add);

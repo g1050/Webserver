@@ -89,6 +89,9 @@ void Http_connect::init(int fd){
     m_line_state = LINE_START;
     m_keep_alive = false;
     m_mime_type = new MimeType();
+
+    /* Once int completer,then it will handle the request. */
+    handleRequest();
 }
 
 

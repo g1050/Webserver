@@ -17,7 +17,7 @@ public:
     static void init(int thread_number);
     static bool destroy();
     static void *threadRoutine(void *arg);
-    static bool addTask(func_p p,int argument);
+    static bool addTask(func_p func,int arg);
 private:
     static pthread_mutex_t m_lock; 
     static pthread_cond_t m_cond;

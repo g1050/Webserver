@@ -76,6 +76,8 @@ public:
     Http_connect(){} 
     void handleRequest();
     void init(int fd);
+    int getFd(){return m_fd;}
+    void setFd(int fd){m_fd = fd;}
 
 private:
     int m_fd;

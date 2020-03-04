@@ -14,6 +14,8 @@ int Epoll::wait(int max_events,int timeout){
     while(true){
 
         debug("Epoll start!");
+        int sockfd;
+        vector<Http_connect*> m_IO_events;
         number = epoll_wait(m_epollfd,m_active_events,max_events,timeout);
         check_exit(number >= 0,"func: Epollwait error. errorno:%d\n",errno);
 
@@ -24,7 +26,7 @@ int Epoll::wait(int max_events,int timeout){
 
 
         for(int i = 0;i<number;i++){
-            int sockfd = m_active_events[i].data.fd;
+            sockfd = m_active_events[i].data.fd;
 
             if(sockfd == m_listenfd){
                 struct sockaddr_in client_address;
@@ -41,7 +43,9 @@ int Epoll::wait(int max_events,int timeout){
                 add(connfd,events_type);
             }else{
                 //Judge the type of I/O,push into vector.
+                m_http[sockfd].setFd(sockfd);
                 m_IO_events.push_back(&m_http[sockfd]);
+
                 /* m_http[m_active_events->data.fd].init(sockfd); */
                 /* m_http[m_active_events->data.fd].handleRequest(); */
             }
@@ -51,9 +55,12 @@ int Epoll::wait(int max_events,int timeout){
         //Traverse the vector,add them to the threadpool.
         if(!m_IO_events.empty()) {
             for(auto &cur_http:m_IO_events){
-                Threadpool::add(cur_http->init(),sockfd);
+                debug("Socket:%d is going to be added to threadpool\n",cur_http->getFd());
+
+                Threadpool::addTask(std::bind(&Http_connect::init,cur_http,std::placeholders::_1),cur_http->getFd());
             }
         }
+        m_IO_events.clear();
     }
 
     return number;

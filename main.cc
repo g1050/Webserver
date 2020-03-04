@@ -2,6 +2,7 @@
 #include "ulity.h"
 #include "epoll.h"
 #include "http_connect.h"
+#include "threadpool.h"
 
 #define MAXEVENTS 5000
 /* #include "http_conn.h" */
@@ -34,11 +35,14 @@ int main(int argc,char *argv[])
     /* Parse argument,read config. */
     const char* ip = "127.0.0.1";
     int port = 8080;
+    int thread_num = 4;
     log_info("Server starts.");
 
     /* ignore SIGPIPE */
     addsig(SIGPIPE,SIG_IGN);
 
+    /* Init threadpool. */
+    Threadpool::init(thread_num);
     /* Create listen socket */
     int listenfd = socket(PF_INET,SOCK_STREAM,0);
     check_exit(listenfd >= 0,"func:socket error.");
@@ -63,6 +67,7 @@ int main(int argc,char *argv[])
     ret = listen(listenfd,5);
     check_exit(ret >= 0,"func:listen error.");
 
+    
     /* setNonBlocking(listenfd); */
 
     /* Epoll init */ 
@@ -73,6 +78,7 @@ int main(int argc,char *argv[])
 
     epoll.wait(MAXEVENTS,-1);
 
+    Threadpool::destroy();
     close(listenfd);
 
 
