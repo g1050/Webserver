@@ -20,6 +20,10 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <queue>
+#include <functional>
+#include <memory>
+#include <pthread.h>
 #include "debug.h"
 
 #define MAXSIZE 4096

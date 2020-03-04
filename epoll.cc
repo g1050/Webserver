@@ -42,7 +42,7 @@ int Epoll::wait(int max_events,int timeout){
             }else{
                 //Judge the type of I/O,push into vector.
                 m_IO_events.push_back(&m_http[sockfd]);
-                /* m_http[m_active_events->data.fd].init(m_active_events->data.fd); */
+                /* m_http[m_active_events->data.fd].init(sockfd); */
                 /* m_http[m_active_events->data.fd].handleRequest(); */
             }
 
